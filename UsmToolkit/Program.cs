@@ -7,7 +7,7 @@ namespace UsmToolkit
 {
     [Command("UsmToolkit")]
     [VersionOptionFromMember("--version", MemberName = nameof(GetVersion))]
-    [Subcommand(typeof(ExtractCommand), typeof(ConvertCommand), typeof(GetDependenciesCommand))]
+    [Subcommand(typeof(ExtractCommand), typeof(ConvertCommand))]
     class Program
     {
         static int Main(string[] args)

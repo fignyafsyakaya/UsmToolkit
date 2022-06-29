@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using System;
+using Newtonsoft.Json;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -32,18 +33,12 @@ namespace UsmToolkit
             JoinConfig conf = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText("config.json"));
 
             StringBuilder sb = new StringBuilder();
-            sb.Append($"-i \"{Path.ChangeExtension(usmStream.FilePath, usmStream.FileExtensionVideo)}\" ");
+            sb.Append($"-i \"{Path.ChangeExtension(usmStream.VideoFilePath, usmStream.FileExtensionVideo)}\" ");
 
-            if (usmStream.HasAudio)
-                sb.Append($"-i \"{Path.ChangeExtension(usmStream.FilePath, usmStream.FinalAudioExtension)}\" ");
-
-            sb.Append($"{conf.VideoParameter} ");
-
-            if (usmStream.HasAudio)
-                sb.Append($"{conf.AudioParameter} ");
+            sb.Append($"-c:v {conf.VideoParameter} ");
 
             sb.Append($"\"{Path.Combine(outputDir ?? string.Empty, $"{pureFileName}.{conf.OutputFormat}")}\"");
-
+            
             return sb.ToString();
         }
     }

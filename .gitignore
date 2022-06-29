@@ -351,3 +351,11 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# Exclude built binaries
+UsmToolkit/bin
+builds/
+
+# Exclude Jetbrains files
+*.idea
+*launchSettings.json

@@ -62,10 +62,13 @@ namespace VGMToolbox.format
         {            
             public bool ExtractVideo { set; get; }
             public bool ExtractAudio { set; get; }
+            public bool ExtractSubtitles { set; get; }
 
             public bool AddHeader { set; get; }
             public bool SplitAudioStreams { set; get; }
             public bool AddPlaybackHacks { set; get; }
+            
+            public string OutputDir { set; get; }
         }
 
         #region Dictionary Initialization
@@ -165,9 +168,13 @@ namespace VGMToolbox.format
 
         protected abstract int GetVideoPacketHeaderSize(Stream readStream, long currentOffset);
 
+        protected virtual int GetSubtitlePacketHeaderSize(Stream readStream, long currentOffset) { return 0; }
+
         protected virtual int GetAudioPacketFooterSize(Stream readStream, long currentOffset) { return 0; }
 
         protected virtual int GetVideoPacketFooterSize(Stream readStream, long currentOffset) { return 0; }
+        
+        protected virtual int GetSubtitlePacketFooterSize(Stream readStream, long currentOffset) { return 0; }
 
         protected virtual bool IsThisAnAudioBlock(byte[] blockToCheck)
         {
@@ -178,6 +185,11 @@ namespace VGMToolbox.format
         protected virtual bool IsThisAVideoBlock(byte[] blockToCheck)
         {
             return ((blockToCheck[3] >= 0xE0) && (blockToCheck[3] <= 0xEF));
+        }
+
+        protected virtual bool IsThisASubtitleBlock(byte[] blockToCheck)
+        {
+            return false;
         }
 
         protected virtual bool IsThisASubPictureBlock(byte[] blockToCheck)
@@ -221,9 +233,11 @@ namespace VGMToolbox.format
                 
                 int audioBlockSkipSize;
                 int videoBlockSkipSize;
+                int subtitleBlockSkipSize;
 
                 int audioBlockFooterSize;
                 int videoBlockFooterSize;
+                int subtitleBlockFooterSize;
 
                 int cutSize;
 
@@ -320,7 +334,8 @@ namespace VGMToolbox.format
                                         isAudioBlock = this.IsThisAnAudioBlock(currentBlockId);
 
                                         if ((demuxOptions.ExtractAudio && isAudioBlock) ||
-                                            (demuxOptions.ExtractVideo && this.IsThisAVideoBlock(currentBlockId)))
+                                            (demuxOptions.ExtractVideo && this.IsThisAVideoBlock(currentBlockId)) ||
+                                            (demuxOptions.ExtractSubtitles && this.IsThisASubtitleBlock(currentBlockId)))
                                         {
                                             // reset stream id
                                             streamId = 0;
@@ -358,14 +373,20 @@ namespace VGMToolbox.format
                                                         this.StreamIdFileType.Add(streamId, audioFileExtension);
                                                     }
                                                 }
-                                                else
+                                                else if (this.IsThisAVideoBlock(currentBlockId))
                                                 {
                                                     this.FileExtensionVideo = this.GetVideoFileExtension(fs, currentOffset);
                                                     outputFileName += this.FileExtensionVideo;
                                                 }
+                                                else // Text block
+                                                {
+                                                    outputFileName += ".sub";
+                                                }
 
-                                                // add output directory
-                                                outputFileName = Path.Combine(Path.GetDirectoryName(this.FilePath), outputFileName);
+                                                    // add output directory
+                                                outputFileName = Path.Combine(demuxOptions.OutputDir, outputFileName);
+                                                
+                                                Directory.CreateDirectory(demuxOptions.OutputDir);
 
                                                 // add an output stream for writing
                                                 streamOutputWriters[currentStreamKey] = new FileStream(outputFileName, FileMode.Create, FileAccess.ReadWrite);
@@ -389,7 +410,7 @@ namespace VGMToolbox.format
                                                 //}
 #endif
                                             }                                           
-                                            else
+                                            else if (this.IsThisAVideoBlock(currentBlockId))
                                             {
                                                 // write video
                                                 videoBlockSkipSize = this.GetVideoPacketHeaderSize(fs, currentOffset);
@@ -405,6 +426,16 @@ namespace VGMToolbox.format
                                                 //    int vvv = 1;
                                                 //}
 #endif
+                                            }
+                                            else // Subtitle block
+                                            {
+                                                subtitleBlockSkipSize = this.GetSubtitlePacketHeaderSize(fs, currentOffset);
+                                                subtitleBlockFooterSize = this.GetSubtitlePacketFooterSize(fs, currentOffset);
+                                                cutSize = (int)(blockSize - subtitleBlockSkipSize - subtitleBlockFooterSize);
+                                                if (cutSize > 0)
+                                                {
+                                                    streamOutputWriters[currentStreamKey].Write(ParseFile.ParseSimpleOffset(fs, currentOffset + currentBlockId.Length + blockSizeArray.Length + subtitleBlockSkipSize, (int)(blockSize - subtitleBlockSkipSize)), 0, cutSize);
+                                                }
                                             }
                                         }
 

@@ -1,11 +1,10 @@
 ﻿using McMaster.Extensions.CommandLineUtils;
-using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Net;
+using System.Text;
 using VGMToolbox.format;
 
 namespace UsmToolkit
@@ -17,6 +16,9 @@ namespace UsmToolkit
         [FileOrDirectoryExists]
         [Argument(0, Description = "File or folder containing usm files")]
         public string InputPath { get; set; }
+        
+        [Option(CommandOptionType.SingleValue, Description = "Specify output directory", ShortName = "o", LongName = "output-dir")]
+        public string OutputDir { get; set; }
 
         protected int OnExecute(CommandLineApplication app)
         {
@@ -44,8 +46,14 @@ namespace UsmToolkit
                 AddPlaybackHacks = false,
                 ExtractAudio = true,
                 ExtractVideo = true,
-                SplitAudioStreams = false
+                ExtractSubtitles = true,
+                SplitAudioStreams = false,
+                OutputDir = this.OutputDir
             });
+            
+            Console.WriteLine("Converting Subs...");
+            ConvertCommand.ConvertSubs(usmStream.SubtitleFilePath);
+            File.Delete(usmStream.SubtitleFilePath);
         }
     }
     
@@ -89,13 +97,70 @@ namespace UsmToolkit
                 AddPlaybackHacks = false,
                 ExtractAudio = true,
                 ExtractVideo = true,
-                SplitAudioStreams = false
+                ExtractSubtitles = true,
+                SplitAudioStreams = false,
+                OutputDir = this.OutputDir
             });
 
             if (!string.IsNullOrEmpty(OutputDir) && !Directory.Exists(OutputDir))
                 Directory.CreateDirectory(OutputDir);
 
             JoinOutputFile(usmStream);
+            Console.WriteLine("Converting Subs...");
+            ConvertSubs(usmStream.SubtitleFilePath);
+            File.Delete(usmStream.SubtitleFilePath);
+        }
+
+        public static void ConvertSubs(string file)
+        {
+            var path = file[..^4] + ".txt";
+            List<string> lines = new List<string>();
+            
+            var framerate = 0;
+            var inputSubBytes = File.ReadAllBytes(file);
+            var offset = 0;
+            
+            while (offset + 32 < inputSubBytes.Length) // Should be good in theory
+            {
+                var framerateHex = new byte[4];
+                Array.Copy(inputSubBytes, offset + 4, framerateHex, 0, 4);
+                var startHex = new byte[4];
+                Array.Copy(inputSubBytes, offset + 8, startHex, 0, 4);
+                var durationHex = new byte[4];
+                Array.Copy(inputSubBytes, offset + 12, durationHex, 0, 4);
+                if (!BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(framerateHex);
+                    Array.Reverse(startHex);
+                    Array.Reverse(durationHex);
+                }
+                if (framerate == 0)
+                {
+                    framerate = BitConverter.ToInt32(framerateHex, 0);
+                    lines.Add(framerate.ToString());
+                }
+                var start = BitConverter.ToInt32(startHex, 0);
+                var duration = BitConverter.ToInt32(durationHex, 0);
+                // We ignore the 4 bytes after this
+                offset += 20;
+                var text = new StringBuilder();
+                while (!(inputSubBytes[offset] == 0x00 && inputSubBytes[offset + 1] == 0x00))
+                {
+                    if (inputSubBytes[offset] == 0x23 && inputSubBytes[offset + 1] == 0x43)
+                    {
+                        if (offset + 32 < inputSubBytes.Length)
+                        {
+                            break;
+                        }
+                    }
+                    text.Append(Convert.ToChar(inputSubBytes[offset]));
+                    offset++;
+                }
+                lines.Add(start + ", " + (start + duration) + ", " + text);
+                offset += 2;
+            }
+            
+            File.WriteAllLines(path, lines);
         }
 
         private void JoinOutputFile(CriUsmStream usmStream)
@@ -120,55 +185,26 @@ namespace UsmToolkit
                 }
 
                 Console.WriteLine("adx audio detected, convert to wav...");
-                Helpers.ExecuteProcess("vgmstream/test.exe", $"\"{Path.ChangeExtension(usmStream.FilePath, usmStream.FinalAudioExtension)}\" -o \"{Path.ChangeExtension(usmStream.FilePath, "wav")}\"");
-
+                foreach (var file in usmStream.CreatedFiles.Where(file => file.EndsWith(".adx")))
+                {
+                    Helpers.ExecuteProcess("vgmstream/test", $"\"{Path.ChangeExtension(file, usmStream.FinalAudioExtension)}\" -o \"{Path.ChangeExtension( Path.Combine(OutputDir, Path.GetFileName(file)), "wav")}\"");
+                }
+                
                 usmStream.FinalAudioExtension = ".wav";
             }
 
-            Helpers.ExecuteProcess("ffmpeg", Helpers.CreateFFmpegParameters(usmStream, pureFileName, OutputDir));
+            usmStream.HasAudio = false;
 
-            if (CleanTempFiles)
+            Helpers.ExecuteProcess("ffmpeg/ffmpeg", Helpers.CreateFFmpegParameters(usmStream, pureFileName, OutputDir));
+
+            if (!CleanTempFiles) return;
+            Console.WriteLine($"Cleaning up temporary files from {pureFileName}");
+            foreach (var file in usmStream.CreatedFiles)
             {
-                Console.WriteLine($"Cleaning up temporary files from {pureFileName}");
-
-                File.Delete(Path.ChangeExtension(usmStream.FilePath, "wav"));
-                File.Delete(Path.ChangeExtension(usmStream.FilePath, "adx"));
-                File.Delete(Path.ChangeExtension(usmStream.FilePath, "hca"));
-                File.Delete(Path.ChangeExtension(usmStream.FilePath, "m2v"));
+                File.Delete(Path.ChangeExtension(file, "adx"));
+                File.Delete(Path.ChangeExtension(file, "hca"));
+                File.Delete(Path.ChangeExtension(file, "m2v"));
             }
-        }
-    }
-
-    [Command(Description = "Setup ffmpeg and vgmstream needed for conversion")]
-    public class GetDependenciesCommand
-    {
-        protected int OnExecute(CommandLineApplication app)
-        {
-            DepsConfig conf = JsonConvert.DeserializeObject<DepsConfig>(File.ReadAllText("deps.json"));
-            WebClient client = new WebClient();
-
-            Console.WriteLine($"Downloading ffmpeg from {conf.FFmpeg}");
-            client.DownloadFile(conf.FFmpeg, "ffmpeg.zip");
-
-            Console.WriteLine($"Extracting ffmpeg...");
-            using (ZipArchive archive = ZipFile.OpenRead("ffmpeg.zip"))
-            {
-                var ent = archive.Entries.FirstOrDefault(x => x.Name == "ffmpeg.exe");
-                if (ent != null)
-                {
-                    ent.ExtractToFile("ffmpeg.exe", true);
-                }
-            }
-            File.Delete("ffmpeg.zip");
-
-            Console.WriteLine($"Downloading vgmstream from {conf.Vgmstream}");
-            client.DownloadFile(conf.Vgmstream, "vgmstream.zip");
-
-            Console.WriteLine("Extracting vgmstream...");
-            ZipFile.ExtractToDirectory("vgmstream.zip", "vgmstream", true);
-            File.Delete("vgmstream.zip");
-
-            return 0;
         }
     }
 }

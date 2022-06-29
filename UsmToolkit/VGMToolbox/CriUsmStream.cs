@@ -11,6 +11,11 @@ namespace VGMToolbox.format
         public const string DefaultAudioExtension = ".adx";
         public const string DefaultVideoExtension = ".m2v";
         public const string HcaAudioExtension = ".hca";
+        
+        public List<string> CreatedFiles { get; set; }
+        
+        public string VideoFilePath { get; set; }
+        public string SubtitleFilePath { get; set; }
 
         static readonly byte[] HCA_SIG_BYTES = new byte[] { 0x48, 0x43, 0x41, 0x00 };
 
@@ -47,6 +52,7 @@ namespace VGMToolbox.format
             this.UsesSameIdForMultipleAudioTracks = true;
             this.FileExtensionAudio = DefaultAudioExtension;
             this.FileExtensionVideo = DefaultVideoExtension;
+            this.CreatedFiles = new List<string>();
 
             base.BlockIdDictionary.Clear();
             base.BlockIdDictionary[BitConverter.ToUInt32(ALP_BYTES, 0)] = new BlockSizeStruct(PacketSizeType.SizeBytes, 4); // @ALP
@@ -86,6 +92,20 @@ namespace VGMToolbox.format
             return checkBytes;
         }
 
+        protected override int GetSubtitlePacketHeaderSize(Stream readStream, long currentOffset)
+        {
+            UInt16 checkBytes;
+            OffsetDescription od = new OffsetDescription();
+
+            od.OffsetByteOrder = Constants.BigEndianByteOrder;
+            od.OffsetSize = "2";
+            od.OffsetValue = "8";
+
+            checkBytes = (UInt16)ParseFile.GetVaryingByteValueAtRelativeOffset(readStream, od, currentOffset);
+
+            return checkBytes;
+        }
+
         protected override bool IsThisAnAudioBlock(byte[] blockToCheck)
         {
             return ParseFile.CompareSegment(blockToCheck, 0, SFA_BYTES);
@@ -93,6 +113,11 @@ namespace VGMToolbox.format
         protected override bool IsThisAVideoBlock(byte[] blockToCheck)
         {
             return ParseFile.CompareSegment(blockToCheck, 0, SFV_BYTES);
+        }
+
+        protected override bool IsThisASubtitleBlock(byte[] blockToCheck)
+        {
+            return ParseFile.CompareSegment(blockToCheck, 0, SBT_BYTES);
         }
 
         protected override byte GetStreamId(Stream readStream, long currentOffset)
@@ -132,6 +157,20 @@ namespace VGMToolbox.format
             return checkBytes;
         }
 
+        protected override int GetSubtitlePacketFooterSize(Stream readStream, long currentOffset)
+        {
+            UInt16 checkBytes;
+            OffsetDescription od = new OffsetDescription();
+
+            od.OffsetByteOrder = Constants.BigEndianByteOrder;
+            od.OffsetSize = "2";
+            od.OffsetValue = "0xA";
+
+            checkBytes = (UInt16)ParseFile.GetVaryingByteValueAtRelativeOffset(readStream, od, currentOffset);
+
+            return checkBytes;
+        }
+
         protected override void DoFinalTasks(FileStream sourceFileStream, Dictionary<uint, FileStream> outputFiles, bool addHeader)
         {          
             long headerEndOffset;
@@ -144,7 +183,6 @@ namespace VGMToolbox.format
             string sourceFileName;
             string workingFile;
             string fileExtension;
-            string destinationFileName;
 
             foreach (uint streamId in outputFiles.Keys)
             {
@@ -211,15 +249,10 @@ namespace VGMToolbox.format
                 File.Delete(workingFile);
 
                 workingFile = FileUtil.RemoveChunkFromFile(sourceFileName, footerOffset, footerSize);
-                destinationFileName = Path.ChangeExtension(sourceFileName, fileExtension);
-                destinationFileName = destinationFileName.Substring(0, destinationFileName.LastIndexOf("_"))+fileExtension;
-                File.Copy(workingFile, destinationFileName, true);                
+                CreatedFiles.Add(sourceFileName);
+                if (sourceFileName.EndsWith(".m2v")) VideoFilePath = sourceFileName;
+                else if (sourceFileName.EndsWith(".sub")) SubtitleFilePath = sourceFileName;
                 File.Delete(workingFile);
-
-                if ((sourceFileName != destinationFileName) && (File.Exists(sourceFileName)))
-                {
-                    File.Delete(sourceFileName);
-                }
             }
         }
     }
