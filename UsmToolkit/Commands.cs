@@ -5,6 +5,8 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 using VGMToolbox.format;
 
 namespace UsmToolkit
@@ -22,12 +24,13 @@ namespace UsmToolkit
 
         protected int OnExecute(CommandLineApplication app)
         {
-            FileAttributes attr = File.GetAttributes(InputPath);
-            if (attr.HasFlag(FileAttributes.Directory))
+            var attr = File.GetAttributes(InputPath);
+            var parallelOptions = new ParallelOptions()
             {
-                foreach (var file in Directory.GetFiles(InputPath, "*.usm"))
-                    Process(file);
-            }
+                MaxDegreeOfParallelism = ConvertCommand.CONF.MaxNumberOfThreads
+            };
+            if (attr.HasFlag(FileAttributes.Directory))
+                Parallel.ForEach(Directory.GetFiles(InputPath, "*.usm"), parallelOptions ,Process);
             else
                 Process(InputPath);
 
@@ -51,6 +54,7 @@ namespace UsmToolkit
                 OutputDir = this.OutputDir
             });
             
+            if (string.IsNullOrEmpty(usmStream.SubtitleFilePath)) return;
             Console.WriteLine("Converting Subs...");
             ConvertCommand.ConvertSubs(usmStream.SubtitleFilePath);
             File.Delete(usmStream.SubtitleFilePath);
@@ -60,6 +64,8 @@ namespace UsmToolkit
     [Command(Description = "Convert according to the parameters in config.json")]
     public class ConvertCommand
     {
+        public static readonly JoinConfig CONF = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText("config.json"));
+        
         [Required]
         [FileOrDirectoryExists]
         [Argument(0, Description = "File or folder containing usm files")]
@@ -73,12 +79,14 @@ namespace UsmToolkit
 
         protected int OnExecute(CommandLineApplication app)
         {
-            FileAttributes attr = File.GetAttributes(InputPath);
-            if (attr.HasFlag(FileAttributes.Directory))
+            var conf = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText("config.json"));
+            var attr = File.GetAttributes(InputPath);
+            var parallelOptions = new ParallelOptions()
             {
-                foreach (var file in Directory.GetFiles(InputPath, "*.usm"))
-                    Process(file);
-            }
+                MaxDegreeOfParallelism = conf.MaxNumberOfThreads
+            };
+            if (attr.HasFlag(FileAttributes.Directory))
+                Parallel.ForEach(Directory.GetFiles(InputPath, "*.usm"), parallelOptions ,Process);
             else
                 Process(InputPath);
 
@@ -105,7 +113,8 @@ namespace UsmToolkit
             if (!string.IsNullOrEmpty(OutputDir) && !Directory.Exists(OutputDir))
                 Directory.CreateDirectory(OutputDir);
 
-            JoinOutputFile(usmStream);
+            ConvertOutputFile(usmStream);
+            if (string.IsNullOrEmpty(usmStream.SubtitleFilePath)) return;
             Console.WriteLine("Converting Subs...");
             ConvertSubs(usmStream.SubtitleFilePath);
             File.Delete(usmStream.SubtitleFilePath);
@@ -148,7 +157,7 @@ namespace UsmToolkit
                 {
                     if (inputSubBytes[offset] == 0x23 && inputSubBytes[offset + 1] == 0x43)
                     {
-                        if (offset + 32 < inputSubBytes.Length)
+                        if (offset + 32 >= inputSubBytes.Length)
                         {
                             break;
                         }
@@ -163,7 +172,7 @@ namespace UsmToolkit
             File.WriteAllLines(path, lines);
         }
 
-        private void JoinOutputFile(CriUsmStream usmStream)
+        private void ConvertOutputFile(CriUsmStream usmStream)
         {
             if (!File.Exists("config.json"))
             {
@@ -195,7 +204,7 @@ namespace UsmToolkit
 
             usmStream.HasAudio = false;
 
-            Helpers.ExecuteProcess("ffmpeg/ffmpeg", Helpers.CreateFFmpegParameters(usmStream, pureFileName, OutputDir));
+            Helpers.ExecuteProcess("ffmpeg/ffmpeg", Helpers.CreateFFmpegParameters(usmStream, pureFileName, OutputDir, CONF));
 
             if (!CleanTempFiles) return;
             Console.WriteLine($"Cleaning up temporary files from {pureFileName}");

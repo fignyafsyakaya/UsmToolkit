@@ -1,6 +1,4 @@
-﻿using System;
-using Newtonsoft.Json;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
 using VGMToolbox.format;
@@ -28,10 +26,8 @@ namespace UsmToolkit
             process.WaitForExit();
         }
 
-        public static string CreateFFmpegParameters(CriUsmStream usmStream, string pureFileName, string outputDir)
+        public static string CreateFFmpegParameters(CriUsmStream usmStream, string pureFileName, string outputDir, JoinConfig conf)
         {
-            JoinConfig conf = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText("config.json"));
-
             StringBuilder sb = new StringBuilder();
             sb.Append($"-i \"{Path.ChangeExtension(usmStream.VideoFilePath, usmStream.FileExtensionVideo)}\" ");
 

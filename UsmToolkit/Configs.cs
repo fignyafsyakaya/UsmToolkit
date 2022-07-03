@@ -4,5 +4,6 @@
     {
         public string VideoParameter { get; set; }
         public string OutputFormat { get; set; }
+        public int MaxNumberOfThreads { get; set; }
     }
 }

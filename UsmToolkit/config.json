@@ -1,4 +1,5 @@
 {
     "VideoParameter" : "mpeg4 -qscale:v 1",
-    "OutputFormat" : "avi"
+    "OutputFormat" : "avi",
+    "MaxNumberOfThreads" : 4
 }
