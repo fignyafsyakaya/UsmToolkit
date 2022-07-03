@@ -64,7 +64,7 @@ namespace UsmToolkit
     [Command(Description = "Convert according to the parameters in config.json")]
     public class ConvertCommand
     {
-        public static readonly JoinConfig CONF = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText("config.json"));
+        public static readonly JoinConfig CONF = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText(Program.AbsolutePath("config.json")));
         
         [Required]
         [FileOrDirectoryExists]
@@ -79,14 +79,14 @@ namespace UsmToolkit
 
         protected int OnExecute(CommandLineApplication app)
         {
-            var conf = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText("config.json"));
+            var conf = JsonConvert.DeserializeObject<JoinConfig>(File.ReadAllText(Program.AbsolutePath("config.json")));
             var attr = File.GetAttributes(InputPath);
             var parallelOptions = new ParallelOptions()
             {
                 MaxDegreeOfParallelism = conf.MaxNumberOfThreads
             };
             if (attr.HasFlag(FileAttributes.Directory))
-                Parallel.ForEach(Directory.GetFiles(InputPath, "*.usm"), parallelOptions ,Process);
+                Parallel.ForEach(Directory.GetFiles(InputPath, "*.usm"), parallelOptions, Process);
             else
                 Process(InputPath);
 
@@ -174,7 +174,7 @@ namespace UsmToolkit
 
         private void ConvertOutputFile(CriUsmStream usmStream)
         {
-            if (!File.Exists("config.json"))
+            if (!File.Exists(Program.AbsolutePath("config.json")))
             {
                 Console.WriteLine("ERROR: config.json not found!");
                 return;
@@ -187,7 +187,7 @@ namespace UsmToolkit
             {
                 //ffmpeg can not handle .adx from 0.2 for whatever reason
                 //need vgmstream to format that to wav
-                if (!Directory.Exists("vgmstream"))
+                if (!Directory.Exists(Program.AbsolutePath("vgmstream")))
                 {
                     Console.WriteLine("ERROR: vgmstream folder not found!");
                     return;
@@ -196,7 +196,7 @@ namespace UsmToolkit
                 Console.WriteLine("adx audio detected, convert to wav...");
                 foreach (var file in usmStream.CreatedFiles.Where(file => file.EndsWith(".adx")))
                 {
-                    Helpers.ExecuteProcess("vgmstream/test", $"\"{Path.ChangeExtension(file, usmStream.FinalAudioExtension)}\" -o \"{Path.ChangeExtension( Path.Combine(OutputDir, Path.GetFileName(file)), "wav")}\"");
+                    Helpers.ExecuteProcess(Program.AbsolutePath("vgmstream/test"), $"\"{Path.ChangeExtension(file, usmStream.FinalAudioExtension)}\" -o \"{Path.ChangeExtension( Path.Combine(OutputDir, Path.GetFileName(file)), "wav")}\"");
                 }
                 
                 usmStream.FinalAudioExtension = ".wav";
@@ -204,7 +204,7 @@ namespace UsmToolkit
 
             usmStream.HasAudio = false;
 
-            Helpers.ExecuteProcess("ffmpeg/ffmpeg", Helpers.CreateFFmpegParameters(usmStream, pureFileName, OutputDir, CONF));
+            Helpers.ExecuteProcess(Program.AbsolutePath("ffmpeg/ffmpeg"), Helpers.CreateFFmpegParameters(usmStream, pureFileName, OutputDir, CONF));
 
             if (!CleanTempFiles) return;
             Console.WriteLine($"Cleaning up temporary files from {pureFileName}");

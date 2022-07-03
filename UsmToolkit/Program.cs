@@ -36,5 +36,11 @@ namespace UsmToolkit
 
         private static string GetVersion()
             => typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+
+        public static string AbsolutePath(string file)
+        {
+            var execPath = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(execPath, file);
+        }
     }
 }
