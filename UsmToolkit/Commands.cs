@@ -19,15 +19,20 @@ namespace UsmToolkit
         [Argument(0, Description = "File or folder containing usm files")]
         public string InputPath { get; set; }
         
+        [Required]
         [Option(CommandOptionType.SingleValue, Description = "Specify output directory", ShortName = "o", LongName = "output-dir")]
         public string OutputDir { get; set; }
+
+        [Option(CommandOptionType.SingleValue, Description = "Specify number of threads to use (default : 1)",
+            ShortName = "t", LongName = "threads")]
+        public int MaxNumberOfThreads { get; set; } = 1;
 
         protected int OnExecute(CommandLineApplication app)
         {
             var attr = File.GetAttributes(InputPath);
             var parallelOptions = new ParallelOptions()
             {
-                MaxDegreeOfParallelism = ConvertCommand.CONF.MaxNumberOfThreads
+                MaxDegreeOfParallelism = MaxNumberOfThreads
             };
             if (attr.HasFlag(FileAttributes.Directory))
                 Parallel.ForEach(Directory.GetFiles(InputPath, "*.usm"), parallelOptions ,Process);
@@ -71,11 +76,16 @@ namespace UsmToolkit
         [Argument(0, Description = "File or folder containing usm files")]
         public string InputPath { get; set; }
 
+        [Required]
         [Option(CommandOptionType.SingleValue, Description = "Specify output directory", ShortName = "o", LongName = "output-dir")]
         public string OutputDir { get; set; }
 
         [Option(CommandOptionType.NoValue, Description = "Remove temporary m2v and audio after converting", ShortName = "c", LongName = "clean")]
         public bool CleanTempFiles { get; set; }
+        
+        [Option(CommandOptionType.SingleValue, Description = "Specify number of threads to use (default : 1)",
+            ShortName = "t", LongName = "threads")]
+        public int MaxNumberOfThreads { get; set; } = 1;
 
         protected int OnExecute(CommandLineApplication app)
         {
@@ -83,7 +93,7 @@ namespace UsmToolkit
             var attr = File.GetAttributes(InputPath);
             var parallelOptions = new ParallelOptions()
             {
-                MaxDegreeOfParallelism = conf.MaxNumberOfThreads
+                MaxDegreeOfParallelism = MaxNumberOfThreads
             };
             if (attr.HasFlag(FileAttributes.Directory))
                 Parallel.ForEach(Directory.GetFiles(InputPath, "*.usm"), parallelOptions, Process);
