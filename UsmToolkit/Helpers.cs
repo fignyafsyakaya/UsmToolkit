@@ -29,7 +29,7 @@ namespace UsmToolkit
         public static string CreateFFmpegParameters(CriUsmStream usmStream, string pureFileName, string outputDir, JoinConfig conf)
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append($"-i \"{Path.ChangeExtension(usmStream.VideoFilePath, usmStream.FileExtensionVideo)}\" ");
+            sb.Append($"-y -i \"{Path.ChangeExtension(usmStream.VideoFilePath, usmStream.FileExtensionVideo)}\" ");
 
             sb.Append($"-c:v {conf.VideoParameter} ");
 
