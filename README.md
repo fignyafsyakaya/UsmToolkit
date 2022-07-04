@@ -1,20 +1,15 @@
 # UsmToolkit
 
-
 Tool to convert USM video files into user-friendly formats.
-
-## Getting started
-
-Download ffmpeg and put `ffmpeg` binaries in ffmpeg folder, and `vgmstream` binaries in vgmstream folder (make sure it includes "test" binary)
 
 ### Extracting
 ```
-UsmToolkit extract <file/folder> [-o=OUTPUT_DIRECTORY]
+UsmToolkit extract <file/folder> [-o=OUTPUT_DIRECTORY] [-t=MAX_NUMBER_OF_THREAD]
 ```
 
 ### Converting
 ```
-UsmToolkit convert <file/folder> [-o=OUTPUT_DIRECTORY] [-c]
+UsmToolkit convert <file/folder> [-o=OUTPUT_DIRECTORY] [-c] [-t=MAX_NUMBER_OF_THREAD]
 ```
 -c will clean temporary files
 
@@ -26,7 +21,6 @@ You should find `config.json` in the folder of the executable. With it, you can 
 The default configuration ships as follows:
 
 * Video: Re-encoded ad FMP4 with best quality settings
-* Audio: Re-encoded as WAV files.
 * Output is an AVI file for video, WAV files for audio and TXT file for subtitles. They are converted to be compatible with Scaleform Video Encoder.
 
 You can change these settings to your likings, it's standard ffmpeg syntax.
