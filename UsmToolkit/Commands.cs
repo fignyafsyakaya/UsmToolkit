@@ -184,7 +184,7 @@ namespace UsmToolkit
 			offset++;
                 }
                 string realText = Encoding.UTF8.GetString(text);
-                lines.Add(lang + ", " + start + ", " + (start + duration) + ", " + realText);
+                lines.Add(langID + ", " + start + ", " + (start + duration) + ", " + realText);
             }
             
             File.WriteAllLines(path, lines);
