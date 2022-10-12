@@ -169,15 +169,15 @@ namespace UsmToolkit
                 byte[] text = new byte[0];
                 for (int i = 1; i <= subLength; i++)
                 {
-					byte[] AddByteToArray(byte[] bArray, byte newByte)
-					{
-						byte[] newArray = new byte[bArray.Length + 1];
-						bArray.CopyTo(newArray, 0);
-						newArray[bArray.Length] = newByte;
-						return newArray;
-					}
-					text = AddByteToArray(text, inputSubBytes[offset]);
-					offset++;
+			byte[] AddByteToArray(byte[] bArray, byte newByte)
+			{
+				byte[] newArray = new byte[bArray.Length + 1];
+				bArray.CopyTo(newArray, 0);
+				newArray[bArray.Length] = newByte;
+				return newArray;
+			}
+			text = AddByteToArray(text, inputSubBytes[offset]);
+			offset++;
                 }
                 string realText = Encoding.UTF8.GetString(text);
                 lines.Add(start + ", " + (start + duration) + ", " + realText);
