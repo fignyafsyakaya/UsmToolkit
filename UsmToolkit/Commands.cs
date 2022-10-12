@@ -147,11 +147,14 @@ namespace UsmToolkit
                 Array.Copy(inputSubBytes, offset + 8, startHex, 0, 4);
                 var durationHex = new byte[4];
                 Array.Copy(inputSubBytes, offset + 12, durationHex, 0, 4);
+                var subLengthHex = new byte[4];
+                Array.Copy(inputSubBytes, offset + 16, subLengthHex, 0, 4);
                 if (!BitConverter.IsLittleEndian)
                 {
                     Array.Reverse(framerateHex);
                     Array.Reverse(startHex);
                     Array.Reverse(durationHex);
+                    Array.Reverse(subLengthHex);
                 }
                 if (framerate == 0)
                 {
@@ -159,24 +162,25 @@ namespace UsmToolkit
                     lines.Add(framerate.ToString());
                 }
                 var start = BitConverter.ToInt32(startHex, 0);
-                var duration = BitConverter.ToInt32(durationHex, 0);
-                // We ignore the 4 bytes after this
+                var duration = BitConverter.ToInt32(durationHex, 0); // We DO NOT ignore the 4 bytes after this
+                var subLength = BitConverter.ToInt32(subLengthHex, 0);
                 offset += 20;
                 var text = new StringBuilder();
-                while (!(inputSubBytes[offset] == 0x00 && inputSubBytes[offset + 1] == 0x00))
+                byte[] text = new byte[0];
+                for (int i = 1; i <= subLength; i++)
                 {
-                    if (inputSubBytes[offset] == 0x23 && inputSubBytes[offset + 1] == 0x43)
-                    {
-                        if (offset + 32 >= inputSubBytes.Length)
-                        {
-                            break;
-                        }
-                    }
-                    text.Append(Convert.ToChar(inputSubBytes[offset]));
-                    offset++;
+					byte[] AddByteToArray(byte[] bArray, byte newByte)
+					{
+						byte[] newArray = new byte[bArray.Length + 1];
+						bArray.CopyTo(newArray, 0);
+						newArray[bArray.Length] = newByte;
+						return newArray;
+					}
+					text = AddByteToArray(text, inputSubBytes[offset]);
+					offset++;
                 }
-                lines.Add(start + ", " + (start + duration) + ", " + text);
-                offset += 2;
+                string realText = Encoding.UTF8.GetString(text);
+                lines.Add(start + ", " + (start + duration) + ", " + realText);
             }
             
             File.WriteAllLines(path, lines);
