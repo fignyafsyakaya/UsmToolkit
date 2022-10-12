@@ -141,6 +141,8 @@ namespace UsmToolkit
             
             while (offset + 32 < inputSubBytes.Length) // Should be good in theory
             {
+                var langHex = new byte[4];
+                Array.Copy(inputSubBytes, offset, langHex, 0, 4);
                 var framerateHex = new byte[4];
                 Array.Copy(inputSubBytes, offset + 4, framerateHex, 0, 4);
                 var startHex = new byte[4];
@@ -151,6 +153,7 @@ namespace UsmToolkit
                 Array.Copy(inputSubBytes, offset + 16, subLengthHex, 0, 4);
                 if (!BitConverter.IsLittleEndian)
                 {
+                    Array.Reverse(langHex);
                     Array.Reverse(framerateHex);
                     Array.Reverse(startHex);
                     Array.Reverse(durationHex);
@@ -161,6 +164,7 @@ namespace UsmToolkit
                     framerate = BitConverter.ToInt32(framerateHex, 0);
                     lines.Add(framerate.ToString());
                 }
+                var langID = BitConverter.ToInt32(langHex, 0);
                 var start = BitConverter.ToInt32(startHex, 0);
                 var duration = BitConverter.ToInt32(durationHex, 0); // We DO NOT ignore the 4 bytes after this
                 var subLength = BitConverter.ToInt32(subLengthHex, 0);
@@ -180,7 +184,7 @@ namespace UsmToolkit
 			offset++;
                 }
                 string realText = Encoding.UTF8.GetString(text);
-                lines.Add(start + ", " + (start + duration) + ", " + realText);
+                lines.Add(lang + ", " + start + ", " + (start + duration) + ", " + realText);
             }
             
             File.WriteAllLines(path, lines);
